@@ -43,4 +43,52 @@ public class ProductController {
         List<Product> list = productServicePlus.list(lqw);
         return Result.success(list);
     }
+
+    @GetMapping("/getOneProductById/{id}")
+    public Result getOneProductById(@PathVariable Integer id) {
+        LambdaQueryWrapper<Product> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(Product::getId, id);
+        Product product = productServicePlus.getOne(lqw);
+        return Result.success(product);
+    }
+
+    @GetMapping("/getSearchProductByList/{ids}")
+    public Result getSearchProductByList(@PathVariable String[] ids) {
+        List<String> ids1 = List.of(ids);
+        LambdaQueryWrapper<Product> lqw = new LambdaQueryWrapper<>();
+        lqw.in(Product::getId, ids1);
+        List<Product> list = productServicePlus.list(lqw);
+        return Result.success(list);
+    }
+
+    @GetMapping("/getSearchProductByListOrderBySale/{ids}")
+    public Result getSearchProductByListOrderBySale(@PathVariable String[] ids) {
+        List<String> ids1 = List.of(ids);
+        LambdaQueryWrapper<Product> lqw = new LambdaQueryWrapper<>();
+        lqw.in(Product::getId, ids1);
+        lqw.orderByDesc(Product::getSale);
+        List<Product> list = productServicePlus.list(lqw);
+        return Result.success(list);
+    }
+
+    @GetMapping("/getSearchProductByListOrderByPriceAsc/{ids}")
+    public Result getSearchProductByListOrderByPriceAsc(@PathVariable String[] ids) {
+        List<String> ids1 = List.of(ids);
+        LambdaQueryWrapper<Product> lqw = new LambdaQueryWrapper<>();
+        lqw.in(Product::getId, ids1);
+        lqw.orderByAsc(Product::getPrice);
+        List<Product> list = productServicePlus.list(lqw);
+        return Result.success(list);
+    }
+
+    @GetMapping("/getSearchProductByListOrderByPriceDesc/{ids}")
+    public Result getSearchProductByListOrderByPriceDesc(@PathVariable String[] ids) {
+        List<String> ids1 = List.of(ids);
+        LambdaQueryWrapper<Product> lqw = new LambdaQueryWrapper<>();
+        lqw.in(Product::getId, ids1);
+        lqw.orderByDesc(Product::getPrice);
+        List<Product> list = productServicePlus.list(lqw);
+        return Result.success(list);
+    }
+
 }
