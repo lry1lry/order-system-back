@@ -1,6 +1,7 @@
 package icu.lry.ordersystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import icu.lry.ordersystem.pojo.Address;
 import icu.lry.ordersystem.service.AddressServicePlus;
 import icu.lry.ordersystem.utils.Result;
@@ -21,17 +22,32 @@ public class AddressController {
 
     @PostMapping("/insertAddress")
     public Result insertAddress(@RequestBody Address address) {
-        LambdaQueryWrapper<Address> lqw = new LambdaQueryWrapper<>();
-        lqw.eq(Address::getUsername, address.getUsername())
+        //将该用户的所有地址都变成不默认
+        LambdaUpdateWrapper<Address> luw = new LambdaUpdateWrapper<>();
+        luw.set(Address::getIsDefault, 0);
+        luw.eq(Address::getOpenid, address.getOpenid());
+        addressServicePlus.update(luw);
+        //查找是否有一样的地址
+        LambdaQueryWrapper<Address> lqw0 = new LambdaQueryWrapper<>();
+        lqw0.eq(Address::getUsername, address.getUsername())
                 .eq(Address::getOpenid, address.getOpenid())
                 .eq(Address::getCityName, address.getCityName())
                 .eq(Address::getCountryName, address.getCountryName())
                 .eq(Address::getDetailName, address.getDetailName())
                 .eq(Address::getProvinceName, address.getProvinceName());
-        List<Address> list = addressServicePlus.list(lqw);
+        List<Address> list = addressServicePlus.list(lqw0);
+        //如果有一样的地址，将该地址变为默认
         if(!list.isEmpty()) {
-            return Result.error("当前地址已存在");
+            LambdaUpdateWrapper<Address> luw1 = new LambdaUpdateWrapper<>();
+            luw1.set(Address::getIsDefault, 1);
+            luw1.eq(Address::getId, list.get(0).getId());
+            boolean flag = addressServicePlus.update(luw1);
+            if (flag) {
+                return Result.success("添加成功");
+            }
+            return Result.error("添加失败");
         }
+        //如果没有该地址，插入该地址
         boolean flag = addressServicePlus.save(address);
         if (flag) {
             return Result.success("添加成功");

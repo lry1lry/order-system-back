@@ -1,0 +1,214 @@
+package icu.lry.ordersystem.controller;
+
+import ch.qos.logback.core.model.INamedModel;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import icu.lry.ordersystem.pojo.Cart;
+import icu.lry.ordersystem.pojo.NewOrder;
+import icu.lry.ordersystem.pojo.Product;
+import icu.lry.ordersystem.service.CartServicePlus;
+import icu.lry.ordersystem.service.NewOrderServicePlus;
+import icu.lry.ordersystem.service.ProductServicePlus;
+import icu.lry.ordersystem.utils.Result;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+@RestController
+@RequestMapping("/newOrder")
+@Slf4j
+public class NewOrderController {
+
+    @Autowired
+    private NewOrderServicePlus newOrderServicePlus;
+
+    @Autowired
+    private CartServicePlus cartServicePlus;
+
+    @Autowired
+    private ProductServicePlus productServicePlus;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    @PostMapping("/insertNewOrder")
+    public Result insertNewOrder(@RequestBody NewOrder newOrder) {
+        // 创建订单编号
+        LocalDateTime now = LocalDateTime.now();
+        Long time = System.currentTimeMillis();
+        String orderNum = now.getYear() + newOrder.getOpenid() + time;
+        // 获取商品id
+        LambdaQueryWrapper<Cart> lqw1 = new LambdaQueryWrapper<>();
+        lqw1.eq(Cart::getOpenid, newOrder.getOpenid());
+        lqw1.eq(Cart::getIsChecked, 1);
+        List<Cart> productIdList = cartServicePlus.list(lqw1);
+        List<Cart> productNumList = new ArrayList<>();
+        // 获取对应商品数量
+        for (Cart cart : productIdList) {
+            LambdaQueryWrapper<Cart> lqw2 = new LambdaQueryWrapper<>();
+            lqw2.eq(Cart::getOpenid, newOrder.getOpenid());
+            lqw2.eq(Cart::getProductId, cart.getProductId());
+            List<Cart> productNumList1 = cartServicePlus.list(lqw2);
+            productNumList.add(productNumList1.get(0));
+        }
+        // 将订单信息装入到集合中并插入到订单表中
+        ArrayList<NewOrder> arr = new ArrayList<>();
+        for (int i = 0; i < productIdList.size(); i++) {
+            NewOrder order = new NewOrder(null, orderNum, newOrder.getOpenid(),
+                    productIdList.get(i).getProductId(),
+                    productNumList.get(i).getNum(),
+                    newOrder.getAddress(), newOrder.getConsignee(),
+                    now, null, "0");
+            arr.add(order);
+        }
+        stringRedisTemplate.opsForHash().put("order", now.getYear() + " " + newOrder.getOpenid() + " " + time, "0");
+        boolean flag = newOrderServicePlus.saveBatch(arr);
+        if(flag) {
+            return Result.success1("订单提交成功", orderNum);
+        }
+        return Result.error("订单提交失败");
+    }
+
+    @GetMapping("/getRemainTime/{orderNum}")
+    public Result getRemainTime(@PathVariable String orderNum) {
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getOrderNum, orderNum);
+        List<NewOrder> list = newOrderServicePlus.list(lqw);
+        long oldTime = list.get(0).getCreateTime().toEpochSecond(ZoneOffset.of("+8"));
+        long newTime = System.currentTimeMillis();
+        long time = newTime / 1000 - oldTime;
+        return Result.success(time);
+    }
+
+    @PostMapping("/updateNewOrder")
+    public Result updateNewOrder(@RequestBody NewOrder newOrder) {
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getOrderNum, newOrder.getOrderNum());
+        List<NewOrder> list = newOrderServicePlus.list(lqw);
+        long oldTime = list.get(0).getCreateTime().toEpochSecond(ZoneOffset.of("+8"));
+        long newTime = System.currentTimeMillis();
+        long time = newTime / 1000 - oldTime;
+        if(time > 15 * 60) {
+            return Result.success("订单超时");
+        }
+        LambdaUpdateWrapper<NewOrder> luw = new LambdaUpdateWrapper<>();
+        luw.set(NewOrder::getStatus, newOrder.getStatus());
+        luw.eq(NewOrder::getOrderNum, newOrder.getOrderNum());
+        boolean flag = newOrderServicePlus.update(luw);
+        if(flag) {
+            return Result.success("订单处理成功");
+        }
+        return Result.error("订单处理失败");
+    }
+
+    @GetMapping("/getIsCancelOrPayOrder/{orderNum}")
+    public Result getIsCancelOrder(@PathVariable String orderNum) {
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getOrderNum, orderNum);
+        List<NewOrder> list = newOrderServicePlus.list(lqw);
+        if(list.get(0).getStatus().equals("2")) {
+            return Result.success("订单已取消");
+        }
+        if(list.get(0).getStatus().equals("1")) {
+            return Result.success("订单已支付");
+        }
+        return Result.success("订单可以取消或支付");
+    }
+
+    @PostMapping("/cancelOrderAuto")
+    //系统自动取消订单
+    public Result cancelOrderAuto(@RequestBody NewOrder newOrder) {
+        LambdaUpdateWrapper<NewOrder> luw = new LambdaUpdateWrapper<>();
+        luw.set(NewOrder::getStatus, newOrder.getStatus());
+        luw.eq(NewOrder::getOrderNum, newOrder.getOrderNum());
+        boolean flag = newOrderServicePlus.update(luw);
+        if(flag) {
+            return Result.success("订单取消成功");
+        }
+        return Result.error("订单取消失败");
+    }
+
+    @GetMapping("/checkTimeOutOrder")
+    public Result checkTimeOutOrder() {
+        //获取所有未支付的订单
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getStatus, "0");
+        List<NewOrder> list = newOrderServicePlus.list(lqw);
+        //将未支付订单中超时的订单id存放到集合中
+        long newTime = System.currentTimeMillis();
+        ArrayList<Integer> arr = new ArrayList<>();
+        for (NewOrder newOrder : list) {
+            long oldTime = newOrder.getCreateTime().toEpochSecond(ZoneOffset.of("+8"));
+            if((newTime / 1000 - oldTime) > 15 * 60) {
+                arr.add(newOrder.getId());
+            }
+        }
+        //如果集合为空，无需修改，提升性能
+        if(arr.isEmpty()) {
+            return Result.success();
+        }
+        //进行批量修改
+        LambdaUpdateWrapper<NewOrder> luw = new LambdaUpdateWrapper<>();
+        luw.set(NewOrder::getStatus, "2");
+        luw.in(NewOrder::getId, arr);
+        newOrderServicePlus.update(luw);
+        return Result.success();
+    }
+
+    @GetMapping("/getAllOrderByOpenidAndStatus/{openid}/{status}")
+    public Result getAllOrderByOpenidAndStatus(@PathVariable String openid, @PathVariable String status) {
+        //获取该用户的相关订单信息
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getOpenid, openid);
+        lqw.orderByDesc(NewOrder::getId);
+        if(!status.equals("3")) {
+            lqw.eq(NewOrder::getStatus, status);
+        }
+        List<NewOrder> list = newOrderServicePlus.list(lqw);
+        //根据订单的商品id找到对应商品的信息
+        ArrayList<Product> arr = new ArrayList<>();
+        for (NewOrder newOrder : list) {
+            LambdaQueryWrapper<Product> lqw1 = new LambdaQueryWrapper<>();
+            lqw1.eq(Product::getId, newOrder.getProductId());
+            Product product = productServicePlus.getOne(lqw1);
+            arr.add(product);
+        }
+        return Result.success1(list, arr);
+    }
+
+    @GetMapping("/getOneOrderById/{id}")
+    //获取指定订单的相关信息
+    public Result getOneOrderById(@PathVariable Integer id) {
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getId, id);
+        NewOrder order = newOrderServicePlus.getOne(lqw);
+        //根据商品id找到对应商品信息
+        LambdaQueryWrapper<Product> lqw1 = new LambdaQueryWrapper<>();
+        lqw1.eq(Product::getId, order.getProductId());
+        Product product = productServicePlus.getOne(lqw1);
+        return Result.success1(order, product);
+    }
+
+    @GetMapping("/getOrderByOrderNum/{orderNum}")
+    public Result getOrderByOrderNum(@PathVariable String orderNum) {
+        LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
+        lqw.eq(NewOrder::getOrderNum, orderNum);
+        List<NewOrder> list = newOrderServicePlus.list(lqw);
+        //根据订单的商品id找到对应商品的信息
+        ArrayList<Product> arr = new ArrayList<>();
+        for (NewOrder newOrder : list) {
+            LambdaQueryWrapper<Product> lqw1 = new LambdaQueryWrapper<>();
+            lqw1.eq(Product::getId, newOrder.getProductId());
+            Product product = productServicePlus.getOne(lqw1);
+            arr.add(product);
+        }
+        return Result.success1(list, arr);
+    }
+}
