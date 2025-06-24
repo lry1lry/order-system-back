@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import java.util.List;
 
 @RestController
@@ -20,6 +19,7 @@ public class BigTypeController {
     private BigTypeServicePlus bigTypeServicePlus;
 
     @GetMapping("/getBigType")
+    // 获得商品大类的全部数据
     public Result getBigType() {
         List<BigType> list = bigTypeServicePlus.list();
         return Result.success(list);

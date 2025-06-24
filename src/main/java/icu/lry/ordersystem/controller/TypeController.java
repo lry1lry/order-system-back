@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,15 +31,18 @@ public class TypeController {
     private BigTypeServicePlus bigTypeServicePlus;
 
     @GetMapping("/getAllType")
+    // 得到所有分类
     public Result getAllType() {
         List<Type> typeList = typeServicePlus.list();
         ArrayList<Product> arr = new ArrayList<>();
+        //通过商品id找到对应商品
         for (Type type : typeList) {
             LambdaQueryWrapper<Product> lqw = new LambdaQueryWrapper<>();
             lqw.eq(Product::getId, type.getProductId());
             Product product = productServicePlus.getOne(lqw);
             arr.add(product);
         }
+        //通过商品大类id找到对应商品大类
         ArrayList<BigType> arr1 = new ArrayList<>();
         for (Type type : typeList) {
             LambdaQueryWrapper<BigType> lqw = new LambdaQueryWrapper<>();

@@ -2,7 +2,6 @@ package icu.lry.ordersystem.controller;
 
 import com.aliyuncs.exceptions.ClientException;
 import icu.lry.ordersystem.utils.AlyOSSUtils;
-import icu.lry.ordersystem.utils.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +19,7 @@ public class uploadController {
     @Autowired
     private AlyOSSUtils alyOSSUtils;
 
+    // 将头像上传到服务器中
     @PostMapping("/changeAvatar")
     public String wenjian(MultipartFile image) throws IOException, ClientException {
         String url = alyOSSUtils.upload(image);

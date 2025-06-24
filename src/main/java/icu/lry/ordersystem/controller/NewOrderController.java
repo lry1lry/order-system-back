@@ -39,7 +39,7 @@ public class NewOrderController {
     public Result insertNewOrder(@RequestBody NewOrder newOrder) {
         // 创建订单编号
         LocalDateTime now = LocalDateTime.now();
-        Long time = System.currentTimeMillis();
+        long time = System.currentTimeMillis();
         String orderNum = now.getYear() + newOrder.getOpenid() + time;
         // 获取商品id
         LambdaQueryWrapper<Cart> lqw1 = new LambdaQueryWrapper<>();
@@ -74,6 +74,7 @@ public class NewOrderController {
     }
 
     @GetMapping("/getRemainTime/{orderNum}")
+    // 获得距离提交订单到现在的时间
     public Result getRemainTime(@PathVariable String orderNum) {
         LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
         lqw.eq(NewOrder::getOrderNum, orderNum);
@@ -85,10 +86,13 @@ public class NewOrderController {
     }
 
     @PostMapping("/updateNewOrder")
+    // 更新订单信息
     public Result updateNewOrder(@RequestBody NewOrder newOrder) {
+        // 拿到相关订单信息
         LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
         lqw.eq(NewOrder::getOrderNum, newOrder.getOrderNum());
         List<NewOrder> list = newOrderServicePlus.list(lqw);
+        // 判断是否超时，如果已经超时，返回一个错误信息
         long oldTime = list.get(0).getCreateTime().toEpochSecond(ZoneOffset.of("+8"));
         long newTime = System.currentTimeMillis();
         long time = newTime / 1000 - oldTime;
@@ -99,6 +103,7 @@ public class NewOrderController {
         luw.set(NewOrder::getStatus, newOrder.getStatus());
         //如果为已支付状态，需要修改支付时间，并且修改销量
         if(newOrder.getStatus().equals("1")) {
+            // 设置时间
             luw.set(NewOrder::getPayTime, LocalDateTime.now());
             //获取所有订单信息
             LambdaQueryWrapper<NewOrder> lqw1 = new LambdaQueryWrapper<>();
@@ -107,9 +112,9 @@ public class NewOrderController {
             //将相关订单的id和购买数量放到集合中
             ArrayList<Integer> arr = new ArrayList<>();
             ArrayList<Integer> arr1 = new ArrayList<>();
-            for (int i = 0; i < list1.size(); i++) {
-                arr.add(list1.get(i).getProductId());
-                arr1.add(list1.get(i).getProductNum());
+            for (NewOrder order : list1) {
+                arr.add(order.getProductId());
+                arr1.add(order.getProductNum());
             }
             //依次修改每个订单的销量
             for (int i = 0; i < arr.size(); i++) {
@@ -122,6 +127,7 @@ public class NewOrderController {
                 productServicePlus.update(luw1);
             }
         }
+        // 更新订单
         luw.eq(NewOrder::getOrderNum, newOrder.getOrderNum());
         boolean flag = newOrderServicePlus.update(luw);
         if (flag) {
@@ -131,6 +137,7 @@ public class NewOrderController {
     }
 
     @GetMapping("/getIsCancelOrPayOrder/{orderNum}")
+    // 获得订单是否已经支付或取消
     public Result getIsCancelOrder(@PathVariable String orderNum) {
         LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();
         lqw.eq(NewOrder::getOrderNum, orderNum);
@@ -158,6 +165,7 @@ public class NewOrderController {
     }
 
     @GetMapping("/checkTimeOutOrder")
+    // 检查是否有订单超时
     public Result checkTimeOutOrder() {
         // 获取所有未支付的订单
         LambdaQueryWrapper<NewOrder> lqw = new LambdaQueryWrapper<>();

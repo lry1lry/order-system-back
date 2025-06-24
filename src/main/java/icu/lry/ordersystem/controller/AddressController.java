@@ -6,10 +6,8 @@ import icu.lry.ordersystem.pojo.Address;
 import icu.lry.ordersystem.service.AddressServicePlus;
 import icu.lry.ordersystem.utils.Result;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.math3.analysis.function.Add;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -56,6 +54,7 @@ public class AddressController {
     }
 
     @GetMapping("/getDefaultAddress/{openid}")
+    // 获得该用户的默认地址
     public Result getDefaultAddress(@PathVariable String openid) {
         LambdaQueryWrapper<Address> lqw = new LambdaQueryWrapper<>();
         lqw.eq(Address::getOpenid, openid).eq(Address::getIsDefault, 1);

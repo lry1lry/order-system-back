@@ -30,15 +30,19 @@ public class WxUserInfoController {
     @Value("${wx.secret}")
     private String secret;
 
+    // 登录接口
     @PostMapping("/login")
     public Result login(@RequestBody WxUserInfo wxUserInfo) {
         List<WxUserInfo> users = wxUserInfoServicePlus.list();
         LambdaUpdateWrapper<WxUserInfo> luw = new LambdaUpdateWrapper<>();
+        //循环遍历每个用户，找到对应的用户
         for (WxUserInfo user : users) {
             if(user.getOpenid().equals(wxUserInfo.getOpenid())) {
+                // 更改最后登录的时间
                 luw.set(WxUserInfo::getLastLoginDate, LocalDateTime.now());
                 luw.eq(WxUserInfo::getId, user.getId());
                 boolean flag = wxUserInfoServicePlus.update(luw);
+                // 修改成功以后，将该用户信息返回给前端
                 if(flag) {
                     LambdaQueryWrapper<WxUserInfo> lqw = new LambdaQueryWrapper<>();
                     lqw.eq(WxUserInfo::getId, user.getId());
@@ -47,6 +51,7 @@ public class WxUserInfoController {
                 }
             }
         }
+        // 对于新用户，设置注册和登录时间以后，插入到数据库中，并把相关信息返回给前端
         LocalDateTime ldt = LocalDateTime.now();
         wxUserInfo.setRegisterDate(ldt);
         wxUserInfo.setLastLoginDate(ldt);
@@ -54,6 +59,7 @@ public class WxUserInfoController {
         return Result.success(wxUserInfo);
     }
 
+    //更新用户昵称
     @RequestMapping("/updateNickName")
     public Result updateNickName(@RequestBody WxUserInfo wxUserInfo) {
         LambdaUpdateWrapper<WxUserInfo> luw = new LambdaUpdateWrapper<>();
@@ -66,6 +72,7 @@ public class WxUserInfoController {
         return Result.success("更新成功");
     }
 
+    //更新用户头像
     @RequestMapping("/updateAvatar")
     public Result updateAvatar(@RequestBody WxUserInfo wxUserInfo) {
         LambdaUpdateWrapper<WxUserInfo> luw = new LambdaUpdateWrapper<>();
@@ -78,6 +85,7 @@ public class WxUserInfoController {
         return Result.success("更新成功");
     }
 
+    //通过传过来的code,然后后端发送请求，拿到openid等数据返回给前端
     @GetMapping("/getLoginInfo/{code}")
     public Result test(@PathVariable String code) {
         String url = "https://api.weixin.qq.com/sns/jscode2session?appid="+ appid +"&secret="+ secret +"&js_code="+ code +"&grant_type=authorization_code";

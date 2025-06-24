@@ -29,9 +29,11 @@ public class CartController {
         LambdaQueryWrapper<Cart> lqw = new LambdaQueryWrapper<>();
         lqw.eq(Cart::getOpenid, cart.getOpenid()).eq(Cart::getProductId, cart.getProductId());
         List<Cart> list = cartServicePlus.list(lqw);
+        // 如果传过来的商品数量大于200，返回一个错误提示
         if(cart.getNum() > 200) {
             return Result.error("数量超过限制");
         }
+        // 没找到该用户的相关购物车的信息，直接插入
         if(list.isEmpty()) {
             boolean flag = cartServicePlus.save(cart);
             if(flag) {
@@ -39,9 +41,11 @@ public class CartController {
             }
             return Result.error("加入购物车失败");
         }
+        // 如果购物车中商品原本的数量 + 现在传过来的商品数量 > 200，返回一个错误提示
         if(list.get(0).getNum() + cart.getNum() > 200) {
             return Result.error("数量超过限制");
         }
+        // 更新现在购物车中商品的数量
         LambdaUpdateWrapper<Cart> luw = new LambdaUpdateWrapper<>();
         luw.eq(Cart::getOpenid, cart.getOpenid()).eq(Cart::getProductId, cart.getProductId());
         luw.set(Cart::getNum, cart.getNum() + list.get(0).getNum());
@@ -71,6 +75,7 @@ public class CartController {
     }
 
     @PostMapping("/updateCartChecked")
+    // 更新购物车选中状态
     public Result updateCartChecked(@RequestBody Cart cart) {
         LambdaUpdateWrapper<Cart> luw = new LambdaUpdateWrapper<>();
         luw.set(Cart::getIsChecked, cart.getIsChecked());
@@ -84,6 +89,7 @@ public class CartController {
     }
 
     @PostMapping("/updateCartNum")
+    // 更新购物车数量
     public Result updateCartNum(@RequestBody Cart cart) {
         LambdaUpdateWrapper<Cart> luw = new LambdaUpdateWrapper<>();
         luw.set(Cart::getNum, cart.getNum());
@@ -97,6 +103,7 @@ public class CartController {
     }
 
     @GetMapping("/updateAllCart/{value}/{openid}")
+    // 当用户全选反选时，更新该用户整个购物车的状态
     public Result updateAllCart(@PathVariable Integer value, @PathVariable String openid) {
         LambdaUpdateWrapper<Cart> luw = new LambdaUpdateWrapper<>();
         luw.set(Cart::getIsChecked, value);
@@ -116,7 +123,7 @@ public class CartController {
         lqw.eq(Cart::getIsChecked, 1);
         lqw.orderByDesc(Cart::getId);
         List<Cart> cartList = cartServicePlus.list(lqw);
-        //根据购物车的信息回去商品id,然后获取对应商品的数据
+        //根据购物车的信息获取商品id,然后获取对应商品的数据
         ArrayList<Product> productList = new ArrayList<>();
         for (Cart cart : cartList) {
             LambdaQueryWrapper<Product> lqw1 = new LambdaQueryWrapper<>();
@@ -127,15 +134,18 @@ public class CartController {
         return Result.success1(cartList, productList);
     }
 
-    @GetMapping("/deleteCartByChecked")
-    public Result deleteCartByChecked() {
+    @GetMapping("/deleteCartByChecked/{openid}")
+    public Result deleteCartByChecked(@PathVariable String openid) {
+        // 去除该用户购物车中已选中的商品
         LambdaQueryWrapper<Cart> lqw = new LambdaQueryWrapper<>();
         lqw.eq(Cart::getIsChecked, 1);
+        lqw.eq(Cart::getOpenid, openid);
         cartServicePlus.remove(lqw);
         return Result.success();
     }
 
     @GetMapping("/deleteCartById/{id}")
+    // 通过id删除购物车相关商品
     public Result deleteCartById(@PathVariable Integer id) {
         LambdaQueryWrapper<Cart> lqw = new LambdaQueryWrapper<>();
         lqw.eq(Cart::getId, id);
